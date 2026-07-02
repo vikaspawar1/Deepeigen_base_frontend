@@ -134,7 +134,7 @@ export default function LoggedIn() {
               name: dashboardData.user?.first_name || "",
               email: dashboardData.user?.email || "",
               avatar: dashboardData.user?.profile_picture || "",
-              plan: dashboardData.user?.active_plan || "Free",
+              plan: dashboardData.user?.active_plan || "",
             },
             currentCourse: {
               title: currentCourse?.title || "",
@@ -373,17 +373,15 @@ export default function LoggedIn() {
                   </p>
                 </div>
 
-                <div className="inline-flex px-3 py-1.5 mt-10 bg-[#0f9c95] text-white text-xs sm:text-sm font-semibold rounded-full flex-shrink-0">
-                  {data.user.plan}
-                </div>
-              </div>
 
-              {/* Current Course Card - Shows Recent Watch if available, else shows enrolled course */}
+
+
+              </div>
+ {/* Current Course Card - Shows Recent Watch if available, else shows enrolled course */}
               {(recentWatch || (data.courses && data.courses.length > 0)) ? (
                 // Recent Watch Card OR Enrolled Course Card
                 <div className="bg-white/12 rounded-xl p-5 md:p-7 mb-15">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-
 
                     <div className="flex-1">
                       {recentWatch ? (
@@ -411,17 +409,6 @@ export default function LoggedIn() {
                               {recentWatch.module_name}
                             </p>
                           )}
-                          {/* Watched timestamp */}
-                          {recentWatch.watched_at && (
-                            <p className="text-white/40 text-xs mt-2">
-                              Last watched: {new Date(recentWatch.watched_at).toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </p>
-                          )}
                         </>
                       ) : (
                         // Show enrolled course when no recent watch - use first course with progress or first course
@@ -438,30 +425,46 @@ export default function LoggedIn() {
                         </>
                       )}
                     </div>
-                    <button
-                      onClick={() => {
-                        if (recentWatch) {
-                          navigate(
-                            `/course-view/${recentWatch.course_id}/${recentWatch.course_url}/${recentWatch.section_url}`,
-                            {
-                              state: {
-                                courseTitle: recentWatch.course_title,
-                                returnTo: "/user_dashboard"
+
+                    {/* Right side: button + watched_at */}
+                    <div className="flex flex-col items-end gap-2">
+                      <button
+                        onClick={() => {
+                          if (recentWatch) {
+                            navigate(
+                              `/course-view/${recentWatch.course_id}/${recentWatch.course_url}/${recentWatch.section_url}`,
+                              {
+                                state: {
+                                  courseTitle: recentWatch.course_title,
+                                  returnTo: "/user_dashboard",
+                                },
                               }
-                            }
-                          );
-                        } else {
-                          // Use enrolled course
-                          handleWatch();
-                        }
-                      }}
-                      className="flex items-center cursor-pointer justify-center gap-2 w-full md:w-auto px-4 py-2 border border-white text-white text-sm md:text-base font-semibold rounded-full hover:bg-white/10 transition"
-                    >
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                        <path d="M8 5.14v14l11-7-11-7z" fill="currentColor" />
-                      </svg>
-                      {recentWatch ? "Continue Watching" : "Start Learning"}
-                    </button>
+                            );
+                          } else {
+                            handleWatch();
+                          }
+                        }}
+                        className="flex items-center cursor-pointer justify-center gap-2 w-full md:w-auto px-4 py-2 border border-white text-white text-sm md:text-base font-semibold rounded-full hover:bg-white/10 transition"
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <path d="M8 5.14v14l11-7-11-7z" fill="currentColor" />
+                        </svg>
+                        {recentWatch ? "Continue Watching" : "Start Learning"}
+                      </button>
+                      {/* Watched timestamp - below button */}
+                      {recentWatch?.watched_at && (
+                        <p className="text-white/80 text-xs  text-right">
+                          Last watched:{" "}
+                          {new Date(recentWatch.watched_at).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      )}
+                    </div>
+
                   </div>
                 </div>
               ) : (
@@ -488,6 +491,10 @@ export default function LoggedIn() {
                   </div>
                 </div>
               )}
+
+
+
+
 
               <div className="relative">
                 {/* Tabs */}

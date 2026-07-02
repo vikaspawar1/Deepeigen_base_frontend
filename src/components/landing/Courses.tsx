@@ -18,6 +18,7 @@ export default function Courses() {
                 const response = await api.get("/courses/?featured=true");
 
         const data = response.data;
+        console.log('Fetched courses:', data); // Log the entire response for debugging
 
         // Backend returns data.courses array
         if (data.courses && Array.isArray(data.courses)) {
