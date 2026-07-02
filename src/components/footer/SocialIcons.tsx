@@ -1,18 +1,10 @@
 import "../landing/footer.css"
 import { FaLinkedin, FaTwitter} from "react-icons/fa"; // or any icons you prefer
-import { IoCall } from "react-icons/io5";
 import { IoMdMail } from "react-icons/io";
 const SocialIcons = () => {
   return (
     <div className="social-icons">
-      <a
-        href="7552980307"
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Phone"
-      >
-        <IoCall />
-      </a>
+    
       <a
         href="https://instagram.com/deepeigen"
         target="_blank"
