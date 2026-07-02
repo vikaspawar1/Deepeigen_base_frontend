@@ -197,7 +197,23 @@ export default function EditProfile({
       )}
     </div>
 
-    {/* Camera button */}
+    <input
+      id="profile-picture-input"
+      type="file"
+      accept="image/*"
+      className="hidden"
+      onChange={handleProfilePictureChange}
+    />
+    <label
+      htmlFor="profile-picture-input"
+      className="absolute bottom-2 right-2 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-[#1A212F] text-white shadow-lg"
+    >
+      <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M12 16a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
+        <path d="M8.5 3.5h-2A2.5 2.5 0 0 0 4 6v12a2.5 2.5 0 0 0 2.5 2.5h11A2.5 2.5 0 0 0 20 18V8.5a2.5 2.5 0 0 0-2.5-2.5h-2" />
+        <path d="m10 8 2-2 2 2" />
+      </svg>
+    </label>
   </div>
 
   <p className="text-[rgba(26,33,47,0.7)] text-sm">
