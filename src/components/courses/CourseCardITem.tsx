@@ -9,7 +9,7 @@ import { selectIsAuthenticated } from "../../redux/slices/auth";
 interface Course {
     id: number;
     title: string;
-    description: string;
+    course_description: string;
     course_image: string;
     duration: string;
     category: string;
@@ -59,7 +59,7 @@ const CourseCardITem: FC<CourseCardItemProps> = ({ course }) => {
                 {/* h-full and flex-grow here ensure the content area fills the card */}
                 <div className="course-content flex flex-col flex-grow">
                     <h3 className="course-title line-clamp-2 min-h-[3rem]">{course.title}</h3>
-                    <p className="course-description line-clamp-2 mt-2">{course.description}</p>
+                    <p className="course-description line-clamp-2 mt-2">{course.course_description}</p>
 
                     <div className="flex-grow"></div> {/* Pushes content below to bottom */}
 
