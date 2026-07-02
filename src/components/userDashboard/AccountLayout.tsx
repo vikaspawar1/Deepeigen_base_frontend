@@ -186,7 +186,7 @@ export default function AccountLayout() {
 
           {isLogoutModalOpen && (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
-        <div className="relative w-full max-w-[560px] rounded-[24px] bg-white px-8 py-10 shadow-2xl">
+        <div className="relative w-full max-w-[500px] rounded-[24px] bg-white px-8 py-10 shadow-2xl">
 
             {/* Close Button */}
             <button
@@ -198,7 +198,7 @@ export default function AccountLayout() {
 
             {/* Logout Icon */}
             <div className="flex justify-center">
-                <div className="flex h-[100px] w-[100px] items-center justify-center rounded-full bg-[#FFD8AE]">
+                <div className="flex sm:h-[90px] sm:w-[90px]   h-[80px] w-[80px] items-center justify-center rounded-full bg-[#FFD8AE]">
                     <svg
                         width="34"
                         height="54"
@@ -217,7 +217,7 @@ export default function AccountLayout() {
             </div>
 
             {/* Heading */}
-            <h2 className="mt-8 text-center text-xl  sm:text-4xl md:text-3xl font-semibold leading-none text-[#1A2130]">
+            <h2 className="mt-8 text-center text-xl  sm:text-3xl md:text-3xl font-semibold leading-none text-[#1A2130]">
                 Logout?
             </h2>
 
@@ -233,7 +233,7 @@ export default function AccountLayout() {
 
                 <button
                     onClick={() => setIsLogoutModalOpen(false)}
-                    className="sm:h-[60px] sm:w-[120px] h-[50px] w-[100px] rounded-xl bg-[#174CD2] sm:text-[20px] text-[16px]  font-semibold text-white transition hover:bg-[#123ca7]"
+                    className="sm:h-[55px] sm:w-[120px] h-[50px] w-[100px] rounded-xl bg-[#174CD2] sm:text-[18px] md:text-[18px] text-[16px]  font-semibold text-white transition hover:bg-[#123ca7]"
                 >
                     Cancel
                 </button>
@@ -241,7 +241,7 @@ export default function AccountLayout() {
                 <button
                     onClick={handleLogout}
                     disabled={isLoggingOut}
-                    className="sm:h-[60px] sm:w-[122px] h-[50px] w-[100px] rounded-xl border border-[#EF4444] bg-white sm:text-[20px] text-[16px]  font-semibold text-[#EF4444] transition hover:bg-red-50 disabled:opacity-50"
+                    className="sm:h-[55px] sm:w-[122px] h-[50px] w-[100px] rounded-xl border border-[#EF4444] bg-white sm:text-[18px] md:text-[18px]  text-[16px]  font-semibold text-[#EF4444] transition hover:bg-red-50 disabled:opacity-50"
                 >
                     {isLoggingOut ? "..." : "Logout"}
                 </button>
