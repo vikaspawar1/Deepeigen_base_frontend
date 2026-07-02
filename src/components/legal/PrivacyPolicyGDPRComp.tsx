@@ -22,7 +22,7 @@ const PrivacyPolicyGDPRComp = () => {
                     2013, having its registered office at 42 Abhinav Regal Homes, Awadhpuri, Bhopal- 462022
                     <b>("Company"; "We"; “Our”; "Deep Eigen"). </b>
                     The Company owns, operates and manages the website
-                    <u><a href="https://www.deepeigen.com">Deep Eigen </a></u>
+                    <u><a href="https://www.deepeigen.com"> Deep Eigen </a></u>
                     <b>(“Website”)</b> and the mobile application for mobiles, smart devices and any
                     other compatible device <b>(“Application”)</b> under this brand <b>‘Deep Eigen’</b> (collectively referred to as
                     the <b>‘Platform’</b>) whereby We, through the Platform, provide various Courses to the Users and all the
@@ -215,7 +215,7 @@ const PrivacyPolicyGDPRComp = () => {
                     individual rights, please contact us using one of the following methods:
                     <br />
                     <br />
-                    <b>Email: <a href="mailto: contact@deepeigen.com">contact@deepeigen.com</a></b>
+                    <b>Email: <a href="mailto: contact@deepeigen.com"> contact@deepeigen.com</a></b>
 
                     Address: 42-Abhinav Regal Homes, Awadhpuri, Bhopal, MP - 462022, India
                     <br />
@@ -373,7 +373,7 @@ const PrivacyPolicyGDPRComp = () => {
                     We do not collect personal information of children under 16 years of age. If knowingly or
                     unknowingly, some child under the age of 16 has given us personal data or Information, we will get in
                     touch with parent for consent or delete the said personal data or Information. In the event you want
-                    to inform us about such an event, please email us at <b><a href="mailto: contact@deepeigen.com">contact@deepeigen.com</a></b>
+                    to inform us about such an event, please email us at <b><a href="mailto: contact@deepeigen.com"> contact@deepeigen.com</a></b>
                 </p>
 
 
@@ -413,7 +413,7 @@ const PrivacyPolicyGDPRComp = () => {
                     material changes, will be provided on the Website. We would appreciate if you would stay updated on
                     any policy revisions. We will take your continued use of our Services as the deemed acceptance of the
                     new policies. If you have any queries or issues about the Policy, you may contact us at<b>
-                        <a href="mailto: contact@deepeigen.com">contact@deepeigen.com</a></b>
+                        <a href="mailto: contact@deepeigen.com"> contact@deepeigen.com</a></b>
                 </p>
 
             </div>

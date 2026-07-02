@@ -1,9 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAppSelector } from "../../redux/hooks";
-import { selectIsAuthenticated } from "../../redux/slices/auth/index";
+import { selectIsAuthenticated, selectIsAdmin } from "../../redux/slices/auth/index";
 import api from "../../lib/api";
-import "./styles/courseDetails.css";
+import { toast } from "react-toastify";
 
 
 
@@ -61,11 +61,10 @@ interface CourseResponse {
     indian_fee: number;
     foreign_fee: number;
     image: string;
+    entire_overview: string;
     access_description: string;
     refund_description: string;
     assignment_description: string;
-    brief_overview: string;
-    entire_overview: string;
   };
   teaching_assistants: TeachingAssistant[];
   instructors: Instructor[];
@@ -94,6 +93,7 @@ interface UserProfile {
 export default function CourseDetails() {
   const navigate = useNavigate();
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const isAdmin = useAppSelector(selectIsAdmin);
 
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [course, setCourse] = useState<CourseResponse | null>(null);
@@ -117,11 +117,12 @@ export default function CourseDetails() {
 
 
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const updateIndicator = () => {
       const activeTabEl = tabRefs.current[activeTab];
       const tabsContainer = tabsRef.current;
       if (activeTabEl && tabsContainer) {
+        // Use offsetLeft and offsetWidth directly for accurate positioning
         setIndicatorStyle({
           left: `${activeTabEl.offsetLeft}px`,
           width: `${activeTabEl.offsetWidth}px`,
@@ -129,12 +130,14 @@ export default function CourseDetails() {
       }
     };
 
-    updateIndicator();
-    const frameId = window.requestAnimationFrame(updateIndicator);
+    // Small delay to ensure DOM is rendered
+    const timeoutId = setTimeout(updateIndicator, 0);
+
+    // Also update on window resize
     window.addEventListener('resize', updateIndicator);
 
     return () => {
-      window.cancelAnimationFrame(frameId);
+      clearTimeout(timeoutId);
       window.removeEventListener('resize', updateIndicator);
     };
   }, [activeTab]);
@@ -156,6 +159,7 @@ export default function CourseDetails() {
         // Separately fetch sections with modules+videos for the curriculum tab
         try {
           const overviewRes = await api.get(`/courses/${id}/${slug}/overview`);
+          // console.log("jhsefbduijwybe", overviewRes.data.sections);
           if (overviewRes.data.sections) {
             setSectionsWithModules(overviewRes.data.sections);
           }
@@ -189,11 +193,36 @@ export default function CourseDetails() {
   };
 
   if (loading) {
-    return <CourseDetailsSkeleton />;
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-white">
+        <div className="flex flex-col items-center">
+          <div className="w-8 h-8 border-[3px] border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <p className="mt-4 text-gray-600 text-[15px]">
+            Loading courses...
+          </p>
+        </div>
+      </div>
+    );
   }
 
   if (error || !course) {
-    return <div className="p-10 text-center text-red-600">{error || "Course not found"}</div>;
+    return (
+      <div className="min-h-[80vh] flex flex-col items-center justify-center bg-white px-4">
+        <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mb-6">
+          <svg className="w-10 h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">Error Loading Course</h2>
+        <p className="text-gray-600 mb-8 max-w-md text-center">{error || "Course not found"}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition shadow-md"
+        >
+          Try Again
+        </button>
+      </div>
+    );
   }
 
 
@@ -206,16 +235,10 @@ export default function CourseDetails() {
           <div className="space-y-6">
             <div>
               <h3 className="font-semibold text-lg mb-3">Course Description</h3>
-              {course.course.entire_overview || course.course.brief_overview ? (
-                <div
-                  className="text-gray-700 leading-relaxed rich-text-content"
-                  dangerouslySetInnerHTML={{ __html: course.course.entire_overview || course.course.brief_overview }}
-                />
-              ) : (
-                <p className="text-gray-700 whitespace-pre-line leading-relaxed">
-                  {course.course.meta_description}
-                </p>
-              )}
+              <div
+                className="text-gray-700 leading-relaxed rich-text-content"
+                dangerouslySetInnerHTML={{ __html: course.course.entire_overview }}
+              />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -379,93 +402,26 @@ export default function CourseDetails() {
 
       case "accessibility":
         return (
-          <div className="space-y-4">
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h3 className="font-semibold text-blue-700 mb-2">Course Access</h3>
-              {course.course.access_description ? (
-                <div
-                  className="text-gray-700 rich-text-content"
-                  dangerouslySetInnerHTML={{ __html: course.course.access_description }}
-                />
-              ) : (
-                <p className="text-gray-700">
-                  Lifetime access to course materials after enrollment.
-                </p>
-              )}
-            </div>
-            {!course.course.access_description && (
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-semibold mb-2">Technical Requirements</h3>
-                <ul className="list-disc list-inside text-gray-700 space-y-2">
-                  <li>Stable internet connection</li>
-                  <li>Modern web browser (Chrome, Firefox, Safari)</li>
-                  <li>Python 3.6+ for assignments</li>
-                  <li>Basic knowledge of linear algebra and calculus</li>
-                </ul>
-              </div>
-            )}
-          </div>
+          <div
+            className="text-gray-700 leading-relaxed rich-text-content"
+            dangerouslySetInnerHTML={{ __html: course.course.access_description }}
+          />
         );
 
       case "refund":
         return (
-          <div className="space-y-4">
-            <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-              <h3 className="font-semibold text-red-700 mb-2">Refund Policy</h3>
-              {course.course.refund_description ? (
-                <div
-                  className="text-gray-700 rich-text-content"
-                  dangerouslySetInnerHTML={{ __html: course.course.refund_description }}
-                />
-              ) : (
-                <p className="text-gray-700">
-                  Refunds can be requested within 7 days of enrollment.
-                  Please contact support@deepeigen.com for refund requests.
-                </p>
-              )}
-            </div>
-            {!course.course.refund_description && (
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-semibold mb-2">Terms</h3>
-                <ul className="list-disc list-inside text-gray-700 space-y-2">
-                  <li>Full refund if requested within 7 days</li>
-                  <li>No refund after 7 days of enrollment</li>
-                  <li>Processing time: 5-7 business days</li>
-                </ul>
-              </div>
-            )}
-          </div>
+          <div
+            className="text-gray-700 leading-relaxed rich-text-content"
+            dangerouslySetInnerHTML={{ __html: course.course.refund_description }}
+          />
         );
 
       case "assignment":
         return (
-          <div className="space-y-4">
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h3 className="font-semibold text-blue-700 mb-2">Assignments</h3>
-              {course.course.assignment_description ? (
-                <div
-                  className="text-gray-700 rich-text-content"
-                  dangerouslySetInnerHTML={{ __html: course.course.assignment_description }}
-                />
-              ) : (
-                <p className="text-gray-700">
-                  This course includes hands-on assignments to reinforce learning concepts.
-                  Assignments are designed to test your understanding of machine learning fundamentals.
-                </p>
-              )}
-            </div>
-            {!course.course.assignment_description && (
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-semibold mb-2">Assignment Guidelines</h3>
-                <ul className="list-disc list-inside text-gray-700 space-y-2">
-                  <li>Assignments must be submitted before deadlines</li>
-                  <li>Python programming required</li>
-                  <li>Submit via the course portal</li>
-                  <li>Graded by teaching assistants</li>
-                </ul>
-              </div>
-            )}
-          </div>
+          <div
+            className="text-gray-700 leading-relaxed rich-text-content"
+            dangerouslySetInnerHTML={{ __html: course.course.assignment_description }}
+          />
         );
 
       default:
@@ -474,7 +430,7 @@ export default function CourseDetails() {
   };
 
   return (
-    <div className="min-h-screen bg-white w-full overflow-x-hidden animate-fade-in">
+    <div className="min-h-screen bg-white w-full overflow-x-hidden">
       {/* Hero Section */}
       <div className="sm:max-w-[82vw] md:max-w-[85vw] lg:max-w-[82vw] max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8 md:mb-10 lg:mb-12">
         <div className="rounded-xl md:rounded-2xl min-h-[300px] md:min-h-[320px] lg:min-h-[380px] mt-4 md:mt-6 py-4 md:py-6 lg:py-8 px-3 md:px-4 lg:px-6 bg-gradient-to-r from-[#2B1062] to-[#6E228C] flex flex-col lg:flex-row gap-6 md:gap-8 w-full">
@@ -655,9 +611,14 @@ export default function CourseDetails() {
                   </div>
                 </div>
 
-                {/* Buy Button */}
+                {/* Buy Button / Enter Course */}
                 <button
                   onClick={() => {
+                    if (course.enrolled_user_flg || isAdmin) {
+                      toast.info(isAdmin ? "Accessing course with administrative privileges." : "Opening your enrolled course.");
+                      navigate(`/course-view/${id}/${slug}`);
+                      return;
+                    }
                     const buyCourseUrl = `/buycourse/${id}/${slug}`;
                     if (!isAuthenticated) {
                       navigate("/login", { state: { from: buyCourseUrl } });
@@ -667,7 +628,7 @@ export default function CourseDetails() {
                   }}
                   className="w-full py-3 px-4 bg-blue-700 text-white font-semibold text-sm md:text-base rounded-lg cursor-pointer transition-colors hover:bg-blue-900 min-h-[44px] md:min-h-[48px] flex items-center justify-center"
                 >
-                  Buy this course
+                  {(course.enrolled_user_flg || isAdmin) ? "Enter Course | Full Access" : "Buy this course"}
                 </button>
 
                 {/* Divider with "or" */}
@@ -680,16 +641,25 @@ export default function CourseDetails() {
                 {/* Get Full Access */}
                 <div className="flex flex-col gap-3 md:gap-4">
                   <div>
-                    <h3 className="font-semibold text-base md:text-lg mb-1">Get Full Access</h3>
-                    <p className="text-xs md:text-sm text-gray-700 mb-2">of complete curriculum & all premium courses at</p>
+                    <h3 className="font-semibold text-base md:text-lg mb-1">Get Access with Subscription Plans</h3>
+                    <p className="text-xs md:text-sm text-gray-700 mb-2">of complete curriculum & all premium courses</p>
                     <div className="flex items-center gap-1 md:gap-2 flex-wrap">
-                      <div className="text-lg md:text-xl font-bold">₹{course.course.indian_fee}</div>
-                      <span className="text-xs md:text-sm">/one-time</span>
+                      {/* <div className="text-lg md:text-xl font-bold">₹{course.course.indian_fee}</div>
+                      <span className="text-xs md:text-sm">/one-time</span> */}
                     </div>
                   </div>
 
-                  <button onClick={() => navigate("/pricing")} className="w-full py-2.5 md:py-3 px-4 border border-blue-700 text-blue-700 bg-transparent font-semibold text-xs md:text-sm rounded-lg cursor-pointer transition-colors hover:bg-blue-50 hover:border-blue-900 hover:text-blue-900 min-h-[40px] md:min-h-[44px] flex items-center justify-center">
-                    Subscribe
+                  <button 
+                    onClick={() => {
+                      if (isAdmin) {
+                        toast.info("You already have Full Access via Administrative privileges.");
+                        return;
+                      }
+                      navigate("/pricing")
+                    }} 
+                    className={`w-full py-2.5 md:py-3 px-4 border border-blue-700 text-blue-700 bg-transparent font-semibold text-xs md:text-sm rounded-lg cursor-pointer transition-colors hover:bg-blue-50 hover:border-blue-900 hover:text-blue-900 min-h-[40px] md:min-h-[44px] flex items-center justify-center ${isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {isAdmin ? "Admin Access Enabled" : "Subscribe"}
                   </button>
                 </div>
 
@@ -707,71 +677,3 @@ export default function CourseDetails() {
     </div>
   );
 }
-
-function CourseDetailsSkeleton() {
-  return (
-    <div className="min-h-screen bg-white w-full overflow-x-hidden">
-      {/* Hero Skeleton */}
-      <div className="sm:max-w-[82vw] max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8 md:mb-10 lg:mb-12">
-        <div className="rounded-xl md:rounded-2xl min-h-[300px] md:min-h-[320px] lg:min-h-[380px] mt-4 md:mt-6 py-4 md:py-6 lg:py-8 px-3 md:px-4 lg:px-6 skeleton-hero flex flex-col lg:flex-row gap-6 md:gap-8 w-full">
-          <div className="flex-1 py-6 md:py-8 lg:py-10 flex flex-col gap-3 md:gap-4 w-full">
-            <div className="flex flex-col gap-2 md:gap-3 w-full">
-              <div className="skeleton-title skeleton"></div>
-              <div className="skeleton-text skeleton w-[90%]"></div>
-              <div className="skeleton-text skeleton w-[80%]"></div>
-            </div>
-            <div className="flex flex-wrap gap-2 w-full mt-3 md:mt-4">
-              <div className="skeleton-tab skeleton"></div>
-              <div className="skeleton-tab skeleton"></div>
-            </div>
-          </div>
-          <div className="w-full lg:w-[55%] xl:w-[50%] lg:mt-0 mt-4 md:mt-5">
-            <div className="w-full aspect-video rounded-xl skeleton"></div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content Skeleton */}
-      <div className="sm:max-w-[82vw] max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start w-full">
-          <div className="lg:col-span-8 w-full">
-            <div className="flex flex-col gap-6 w-full">
-              <div className="rounded-lg md:rounded-xl border border-gray-200 px-2 md:px-3 lg:px-4 py-2 mb-3 bg-white w-full">
-                <div className="flex gap-4 md:gap-8 border-b border-gray-200 py-3">
-                  <div className="skeleton-tab skeleton"></div>
-                  <div className="skeleton-tab skeleton"></div>
-                  <div className="skeleton-tab skeleton"></div>
-                </div>
-                <div className="p-6 space-y-4">
-                  <div className="skeleton-text skeleton w-1/4"></div>
-                  <div className="skeleton-text skeleton"></div>
-                  <div className="skeleton-text skeleton"></div>
-                  <div className="skeleton-text skeleton w-3/4"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="lg:col-span-4 w-full">
-            <div className="skeleton-card">
-              <div className="h-12 skeleton mb-6 rounded-t-lg -mx-5 -mt-5"></div>
-              <div className="space-y-6">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <div key={i} className="skeleton-sidebar-item">
-                    <div className="skeleton-icon skeleton"></div>
-                    <div className="flex-1 space-y-2">
-                      <div className="skeleton-line skeleton w-1/3"></div>
-                      <div className="skeleton-line skeleton w-2/3"></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="h-12 skeleton mt-8 rounded-lg"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-

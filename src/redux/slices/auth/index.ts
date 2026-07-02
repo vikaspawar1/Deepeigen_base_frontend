@@ -120,5 +120,7 @@ export const selectUser = (state: { auth: AuthState }) => state.auth.user;
 export const selectAccessToken = (state: { auth: AuthState }) => state.auth.accessToken;
 export const selectIsAuthenticated = (state: { auth: AuthState }) =>
   !!state.auth.user || !!state.auth.accessToken;
+export const selectIsAdmin = (state: { auth: AuthState }) =>
+  Boolean(state.auth.user?.is_staff || state.auth.user?.is_superadmin);
 export const selectIsInitialized = (state: { auth: AuthState }) =>
   state.auth.isInitialized;
