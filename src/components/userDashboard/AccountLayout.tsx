@@ -186,7 +186,7 @@ export default function AccountLayout() {
 
           {isLogoutModalOpen && (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
-        <div className="relative w-full max-w-[500px] rounded-[24px] bg-white px-8 py-10 shadow-2xl">
+        <div className="relative w-full max-w-[500px] rounded-[24px] bg-white px-8 py-10 ">
 
             {/* Close Button */}
             <button

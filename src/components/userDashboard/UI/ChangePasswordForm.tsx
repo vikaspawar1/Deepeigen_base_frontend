@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { toast } from "react-toastify";
-import { changePassword, fetchProfileData, type ProfileData } from "../data/typesprofile";
+import { changePassword } from "../data/typesprofile";
 // import { spread } from "axios";
 
-export default function ChangePasswordForm() {
+export default function ChangePasswordForm({ profilePicture }: { profilePicture?: string | null }) {
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showReNew, setShowReNew] = useState(false);
@@ -13,26 +13,11 @@ export default function ChangePasswordForm() {
   const [confirmPassword, setConfirmPassword] = useState("");
 
   const [isLoading, setIsLoading] = useState(false);
-  const [profile, setProfile] = useState<ProfileData | null>(null);
-
-  useEffect(() => {
-    const loadProfileData = async () => {
-      try {
-        const response = await fetchProfileData();
-        if (response.success && response.data) {
-          setProfile(response.data.profile);
-        }
-      } catch (err) {
-        console.error("Failed to load profile data:", err);
-      }
-    };
-
-    loadProfileData();
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validation
     if (!currentPassword || !newPassword || !confirmPassword) {
       toast.error("All fields are required");
       return;
@@ -88,11 +73,11 @@ export default function ChangePasswordForm() {
 
         {/* Avatar */}
         <div className="w-32 h-32 lg:w-40 lg:h-40 flex justify-center items-center rounded-xl bg-[rgba(0,0,0,0.04)] self-center lg:self-start overflow-hidden">
-          {profile?.profilePicture ? (
-            <img
-              src={profile.profilePicture}
-              alt="Profile"
-              className="w-full h-full object-cover"
+          {profilePicture ? (
+            <img 
+              src={profilePicture} 
+              alt="Profile" 
+              className="w-full h-full object-cover" 
             />
           ) : (
             <svg
