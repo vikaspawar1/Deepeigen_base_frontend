@@ -177,73 +177,33 @@ export default function EditProfile({
       <div className="lg:py-14 w-full px-6 md:px-12 lg:px-16">
 
         {/* Profile Picture Upload */}
-        <div className="flex flex-col items-center mb-6">
-          <div className="relative w-40 h-40 lg:w-48 lg:h-48 mb-4">
-            <div className="w-full h-full rounded-xl bg-[rgba(0,0,0,0.04)] flex justify-center items-center overflow-hidden">
-              {profilePicturePreview ? (
-                <img
-                  src={profilePicturePreview}
-                  alt="Profile"
-                  className="w-full h-full rounded-xl object-cover"
-                />
-              ) : (
-                <svg
-                  className="w-[68px] h-[68px] lg:w-[80px] lg:h-[80px]"
-                  viewBox="0 0 68 68"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M33.9974 28.3334C40.2566 28.3334 45.3307 23.2593 45.3307 17.0001C45.3307 10.7409 40.2566 5.66675 33.9974 5.66675C27.7382 5.66675 22.6641 10.7409 22.6641 17.0001C22.6641 23.2593 27.7382 28.3334 33.9974 28.3334Z"
-                    fill="#1A212F"
-                    fillOpacity="0.4"
-                  />
-                  <path
-                    d="M56.6693 49.5833C56.6693 56.6241 56.6693 62.3333 34.0026 62.3333C11.3359 62.3333 11.3359 56.6241 11.3359 49.5833C11.3359 42.5424 21.4849 36.8333 34.0026 36.8333C46.5203 36.8333 56.6693 42.5424 56.6693 49.5833Z"
-                    fill="#1A212F"
-                    fillOpacity="0.4"
-                  />
-                </svg>
-              )}
-            </div>
+       <div className="flex flex-col items-start mb-6">
+  <div className="relative w-40 h-40 lg:w-48 lg:h-48 mb-4">
+    <div className="w-full h-full rounded-xl bg-[rgba(0,0,0,0.04)] flex justify-start items-start overflow-hidden">
+      {profilePicturePreview ? (
+        <img
+          src={profilePicturePreview}
+          alt="Profile"
+          className="w-full h-full rounded-xl object-cover"
+        />
+      ) : (
+        <svg
+          className="w-[68px] h-[68px] lg:w-[80px] lg:h-[80px]"
+          viewBox="0 0 68 68"
+          fill="none"
+        >
+          {/* SVG */}
+        </svg>
+      )}
+    </div>
 
-            <label
-              htmlFor="profile-picture-upload"
-              className="absolute bottom-0 right-0 w-12 h-12 bg-[#174CD2] rounded-full flex items-center justify-center cursor-pointer hover:bg-blue-700 transition-colors shadow-lg"
-            >
-              <svg
-                className="w-6 h-6 text-white"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-              <input
-                id="profile-picture-upload"
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleProfilePictureChange}
-              />
-            </label>
-          </div>
+    {/* Camera button */}
+  </div>
 
-          <p className="text-[rgba(26,33,47,0.7)] text-sm">
-            Click the camera icon to upload a new profile picture
-          </p>
-        </div>
+  <p className="text-[rgba(26,33,47,0.7)] text-sm">
+    Click the camera icon to upload a new profile picture
+  </p>
+</div>
 
         {/* Form */}
         <form className="space-y-8 max-w-3xl ml-0" onSubmit={(e) => e.preventDefault()}>

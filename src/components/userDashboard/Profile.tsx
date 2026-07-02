@@ -356,6 +356,11 @@ export default function Profile() {
           </div>
         )}
 
+
+
+
+
+
         {/* Main Content */}
         <div className={`flex-1 flex flex-col min-h-screen overflow-x-hidden px-6 md:px-12 lg:px-16 ${!isNestedInAccount ? 'pt-8 lg:pt-14' : ''}`}>
           {/* Loading indicator for specific sections */}
@@ -531,6 +536,10 @@ export default function Profile() {
               />
             </div>
           )}
+
+
+
+          
 
           {/* Edit Profile Section */}
           {activeSection === "editProfile" && profile && (

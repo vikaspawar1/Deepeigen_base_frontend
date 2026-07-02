@@ -637,6 +637,7 @@ const Index: React.FC = () => {
               accessibleSectionIds={accessibleSectionIds}
               courseId={courseId}
               enrollmentData={courseData?.enrolled_user}
+              loading={loading}
             />
           </div>
 
@@ -665,6 +666,7 @@ const Index: React.FC = () => {
               accessibleSectionIds={accessibleSectionIds}
             courseId={courseId}
             enrollmentData={courseData?.enrolled_user}
+            loading={loading}
           />
         </div>
       </div>

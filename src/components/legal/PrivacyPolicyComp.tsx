@@ -296,7 +296,7 @@ const PrivacyPolicyComp = () => {
           material changes, will be provided on the website. However, it is your responsibility to stay updated
           on any policy revisions and we will take your continued use of our services as the deemed acceptance
           of the new policies. If you have any queries or issues about the Policy, you may contact us at
-          <a>contact@deepeigen.com</a>
+          <a> contact@deepeigen.com</a>
         </p>
       </div>
     </div>

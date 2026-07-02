@@ -13,7 +13,7 @@ const TermsConditionComp = () => {
                     2013, having its registered office at 42 Abhinav Regal Homes, Awadhpuri, Bhopal- 462022
                     <b>("Company"; "We"; “Our”; "Deep Eigen"). </b>
                     The Company owns, operates and manages the website
-                    <u><a href="https://www.deepeigen.com">Deep Eigen </a></u>
+                    <u><a href="https://www.deepeigen.com"> Deep Eigen </a></u>
                     <b>(“Website”)</b> and the mobile application for mobiles, smart devices and any
                     other compatible device <b>(“Application”)</b> under this brand <b>‘Deep Eigen’</b> (collectively referred to as
                     the <b>‘Platform’</b>) whereby We, through the Platform, provide various Courses to the Users and all the
@@ -865,7 +865,7 @@ const TermsConditionComp = () => {
                 <p>
                     We attempt to make all best endeavours to provide our Users with a content, satisfying and enjoyable
                     experience. In the unlikely event that You face any issues or wish to give any feedback, please contact
-                    us at <b><a href="mailto: contact@deepeigen.com">contact@deepeigen.com</a></b>
+                    us at <b><a href="mailto: contact@deepeigen.com"> contact@deepeigen.com</a></b>
                 </p>
 
                 <p>

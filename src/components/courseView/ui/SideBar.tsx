@@ -12,6 +12,7 @@ interface SideBarProps {
     nextUnlockMessage?: string | null;
     courseId?: number;
     enrollmentData?: any;
+    loading?: boolean;
 }
 
 const SideBar: React.FC<SideBarProps> = ({
@@ -23,7 +24,8 @@ const SideBar: React.FC<SideBarProps> = ({
     accessibleSectionIds = null,
     nextUnlockMessage,
     courseId: _courseId,
-    enrollmentData: _enrollmentData
+    enrollmentData: _enrollmentData,
+    loading = false
 }) => {
     const navigate = useNavigate();
 
@@ -59,10 +61,32 @@ const SideBar: React.FC<SideBarProps> = ({
         // Pass the lecture to parent; parent can determine the section id if needed
         onLectureClick?.(lecture);
     };
+    if (loading) {
+        return (
+            <div className="sidebar-container">
+                <div className="desktop-sidebar">
+                    <div className="w-full lg:w-[28vw] mr-9 lg:ml-5 lg:p-0 mb:ml-10  lg:h-screen h-auto bg-white border-l border-gray-300 overflow-hidden">
+                        <div className="pb-8 space-y-4 p-4 animate-pulse">
+                            {[1, 2, 3, 4,5,6,7,8,9,10,11,12,13,14,15].map((i) => {
+                                const widths = ["w-11/12", "w-5/6", "w-3/4", "w-4/5","w-11/12", "w-5/6", "w-3/4", "w-4/5","w-11/12", "w-5/6", "w-3/4", "w-4/5","w-11/12", "w-5/6", "w-3/4", "w-4/5"];
+                                return (
+                                    <div key={i} className="py-4 border-b border-gray-200 flex justify-between items-center">
+                                        <div className={`h-6 bg-gray-200 rounded ${widths[i - 1]}`}></div>
+                                        <div className="h-4 bg-gray-200 rounded-full w-4 h-4 ml-4 flex-shrink-0"></div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="sidebar-container">
             <div className="desktop-sidebar ">
-                <div className="lg:w-[28vw] overflow-y-auto scrollbar-none mr-9 lg:ml-5 lg:p-0 mb:ml-10 h-auto bg-white border-l border-gray-300   overflow-hidden">
+                <div className="w-full lg:w-[28vw] overflow-y-auto scrollbar-none mr-9 lg:ml-5 lg:p-0 mb:ml-10 h-auto bg-white border-l border-gray-300   overflow-hidden">
                     <div className="pb-8">
                         {weeks.map((week) => {
                             return (
