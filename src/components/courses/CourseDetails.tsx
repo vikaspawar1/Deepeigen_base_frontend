@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAppSelector } from "../../redux/hooks";
 import { selectIsAuthenticated } from "../../redux/slices/auth/index";
 import api from "../../lib/api";
+import "./styles/courseDetails.css";
 
 
 
@@ -116,12 +117,11 @@ export default function CourseDetails() {
 
 
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const updateIndicator = () => {
       const activeTabEl = tabRefs.current[activeTab];
       const tabsContainer = tabsRef.current;
       if (activeTabEl && tabsContainer) {
-        // Use offsetLeft and offsetWidth directly for accurate positioning
         setIndicatorStyle({
           left: `${activeTabEl.offsetLeft}px`,
           width: `${activeTabEl.offsetWidth}px`,
@@ -129,14 +129,12 @@ export default function CourseDetails() {
       }
     };
 
-    // Small delay to ensure DOM is rendered
-    const timeoutId = setTimeout(updateIndicator, 0);
-
-    // Also update on window resize
+    updateIndicator();
+    const frameId = window.requestAnimationFrame(updateIndicator);
     window.addEventListener('resize', updateIndicator);
 
     return () => {
-      clearTimeout(timeoutId);
+      window.cancelAnimationFrame(frameId);
       window.removeEventListener('resize', updateIndicator);
     };
   }, [activeTab]);
@@ -523,7 +521,7 @@ export default function CourseDetails() {
         </div>
       </div>
       {/* Main Content */}
-      <div className="sm:max-w-[85vw] max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="sm:max-w-[82vw] max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start w-full">
           {/* Main Content */}
           <div className="lg:col-span-8 w-full">
@@ -714,7 +712,7 @@ function CourseDetailsSkeleton() {
   return (
     <div className="min-h-screen bg-white w-full overflow-x-hidden">
       {/* Hero Skeleton */}
-      <div className="sm:max-w-[82vw] md:max-w-[85vw] lg:max-w-[82vw] max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8 md:mb-10 lg:mb-12">
+      <div className="sm:max-w-[82vw] max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8 md:mb-10 lg:mb-12">
         <div className="rounded-xl md:rounded-2xl min-h-[300px] md:min-h-[320px] lg:min-h-[380px] mt-4 md:mt-6 py-4 md:py-6 lg:py-8 px-3 md:px-4 lg:px-6 skeleton-hero flex flex-col lg:flex-row gap-6 md:gap-8 w-full">
           <div className="flex-1 py-6 md:py-8 lg:py-10 flex flex-col gap-3 md:gap-4 w-full">
             <div className="flex flex-col gap-2 md:gap-3 w-full">
@@ -734,7 +732,7 @@ function CourseDetailsSkeleton() {
       </div>
 
       {/* Main Content Skeleton */}
-      <div className="sm:max-w-[85vw] max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="sm:max-w-[82vw] max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start w-full">
           <div className="lg:col-span-8 w-full">
             <div className="flex flex-col gap-6 w-full">
