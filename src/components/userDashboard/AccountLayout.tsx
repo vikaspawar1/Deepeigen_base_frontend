@@ -21,6 +21,7 @@ export default function AccountLayout() {
     const location = useLocation();
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
     // Determine active section based on current URL
     const getActiveSection = (): ActiveSection => {
@@ -47,27 +48,30 @@ export default function AccountLayout() {
     };
 
     const handleLogout = async () => {
-        if (isLoggingOut) return;
+    if (isLoggingOut) return;
 
-        setIsLoggingOut(true);
-        try {
-            // Call the backend logout API
-            await logoutUser();
+    setIsLoggingOut(true);
 
-            // Clear Redux state
-            dispatch(logout());
+    try {
+        await logoutUser();
 
-            // Navigate to home page
-            navigate("/", { replace: true });
-        } catch (error) {
-            console.error("Logout error:", error);
-            // Even on error, clear local state and redirect
-            dispatch(logout());
-            navigate("/", { replace: true });
-        } finally {
-            setIsLoggingOut(false);
-        }
-    };
+        dispatch(logout());
+
+        setIsLogoutModalOpen(false);
+
+        navigate("/", { replace: true });
+    } catch (error) {
+        console.error("Logout error:", error);
+
+        dispatch(logout());
+
+        setIsLogoutModalOpen(false);
+
+        navigate("/", { replace: true });
+    } finally {
+        setIsLoggingOut(false);
+    }
+};
 
     return (
         <div className="min-h-screen bg-white mt-[-50px]   relative">
@@ -143,7 +147,7 @@ export default function AccountLayout() {
                             onClick={() => handleSectionClick("billing")}
                             className={`flex items-center cursor-pointer gap-3 px-4 lg:px-10 py-4 lg:py-5 w-full ${activeSection === "billing" ? "bg-[rgba(23,76,210,0.06)]" : "hover:bg-gray-50"}`}
                         >
-                              <img src={bill} alt="bill" />
+                            <img src={bill} alt="bill" />
                             <span className={`flex-1 text-left font-semibold text-base ${activeSection === "billing" ? "text-[#174CD2]" : "text-[rgba(26,33,47,0.7)]"}`}>
                                 Billing and Invoices
                             </span>
@@ -153,25 +157,99 @@ export default function AccountLayout() {
                             onClick={() => handleSectionClick("settings")}
                             className={`flex items-center cursor-pointer gap-3 px-4 lg:px-10 py-4 lg:py-5 w-full ${activeSection === "settings" ? "bg-[rgba(23,76,210,0.06)]" : "hover:bg-gray-50"}`}
                         >
-                                         
-                              <img src={setting} alt="setting" />
+
+                            <img src={setting} alt="setting" />
                             <span className={`flex-1 text-left font-semibold text-base ${activeSection === "settings" ? "text-[#174CD2]" : "text-[rgba(26,33,47,0.7)]"}`}>
                                 Settings
                             </span>
                         </button>
+
+
                         {/* Logout */}
                         <button
-                            onClick={handleLogout}
+                            onClick={() => setIsLogoutModalOpen(true)}
                             disabled={isLoggingOut}
                             className="flex items-center cursor-pointer gap-3 px-4 lg:px-10 py-4 lg:py-5 w-full hover:bg-gray-50 disabled:opacity-50"
                         >
-                           <img src={logouts} alt="logouts" />
+                            <img src={logouts} alt="Logout" />
                             <span className="flex-1 text-left text-[#CE2823] font-semibold text-base">
-                                {isLoggingOut ? "Logging out..." : "Logout"}
+                                Logout
                             </span>
                         </button>
+
+
+
                     </div>
                 </div>
+
+
+
+          {isLogoutModalOpen && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+        <div className="relative w-full max-w-[560px] rounded-[24px] bg-white px-8 py-10 shadow-2xl">
+
+            {/* Close Button */}
+            <button
+                onClick={() => setIsLogoutModalOpen(false)}
+                className="absolute right-6 top-6 text-4xl leading-none text-[#1A2130] hover:opacity-70"
+            >
+                ×
+            </button>
+
+            {/* Logout Icon */}
+            <div className="flex justify-center">
+                <div className="flex h-[100px] w-[100px] items-center justify-center rounded-full bg-[#FFD8AE]">
+                    <svg
+                        width="34"
+                        height="54"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#D92D20"
+                        strokeWidth="2.3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    >
+                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                        <path d="M10 17l-5-5 5-5" />
+                        <path d="M5 12h10" />
+                    </svg>
+                </div>
+            </div>
+
+            {/* Heading */}
+            <h2 className="mt-8 text-center text-xl  sm:text-4xl md:text-3xl font-semibold leading-none text-[#1A2130]">
+                Logout?
+            </h2>
+
+            {/* Description */}
+            <p className="mt-5 text-center text-[20px] leading-8 text-[#6B7280]">
+                Are you sure you want to log out of Deep
+                <br />
+                Eigen?
+            </p>
+
+            {/* Buttons */}
+            <div className="mt-10 flex justify-center gap-5">
+
+                <button
+                    onClick={() => setIsLogoutModalOpen(false)}
+                    className="sm:h-[60px] sm:w-[120px] h-[50px] w-[100px] rounded-xl bg-[#174CD2] sm:text-[20px] text-[16px]  font-semibold text-white transition hover:bg-[#123ca7]"
+                >
+                    Cancel
+                </button>
+
+                <button
+                    onClick={handleLogout}
+                    disabled={isLoggingOut}
+                    className="sm:h-[60px] sm:w-[122px] h-[50px] w-[100px] rounded-xl border border-[#EF4444] bg-white sm:text-[20px] text-[16px]  font-semibold text-[#EF4444] transition hover:bg-red-50 disabled:opacity-50"
+                >
+                    {isLoggingOut ? "..." : "Logout"}
+                </button>
+
+            </div>
+        </div>
+    </div>
+)}
 
                 {/* Main Content */}
                 <div className="flex-1 flex flex-col px-6 lg:px-12 pt-8 lg:pt-14 min-h-screen overflow-x-hidden">

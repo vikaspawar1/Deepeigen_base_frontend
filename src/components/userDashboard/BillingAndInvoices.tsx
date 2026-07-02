@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
+import { selectUser } from '../../redux/slices/auth/index';
 import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/css/pagination";
 import { Pagination, Autoplay } from "swiper/modules";
@@ -12,7 +14,6 @@ import type {
   PurchasedCourse
 } from './data/typesprofile';
 import api from "../../lib/api";
-import { loadRazorpayScript } from '../../lib/razorpay';
 
 
 interface BillingAndInvoicesProps {
@@ -21,9 +22,7 @@ interface BillingAndInvoicesProps {
 
 // Helper function to format date
 const formatDate = (dateString: string) => {
-  if (dateString === 'Lifetime') return 'Lifetime Access';
   const date = new Date(dateString);
-  if (isNaN(date.getTime())) return dateString;
   return date.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -56,20 +55,24 @@ const getStatusBadge = (status: 'paid' | 'pending' | 'failed' | undefined) => {
 
 
 export default function BillingAndInvoices({ billingData }: BillingAndInvoicesProps) {
-  // const [basicModal, setBasicModal] = useState(false);
-  // const [customModal, setCustomModal] = useState(false);
+  const [basicModal, setBasicModal] = useState(false);
+  const [customModal, setCustomModal] = useState(false);
   const [purchasedModal, setPurchasedModal] = useState(false);
   const [cancelModal, setCancelModal] = useState(false);
   const [accessedCoursesModal, setAccessedCoursesModal] = useState(false);
+  const [accessedCourses, setAccessedCourses] = useState<{ id: number; title: string; category: string }[]>([]);
+  const [accessedCoursesLoading, setAccessedCoursesLoading] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [invoiceCheckLoading, setInvoiceCheckLoading] = useState<number | null>(null);
   const [paymentDueData, setPaymentDueData] = useState<PaymentDueData[]>([]);
-  const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+  const [selectedCourseId, setSelectedCourseId] = useState<number | string | null>(null);
   const [paymentHistory, setPaymentHistory] = useState<any>(null);
   const [paymentHistoryLoading, setPaymentHistoryLoading] = useState(false);
   const [invoiceData, setInvoiceData] = useState<InvoiceRegistrantData[]>([]);
   const [purchasedCourses, setPurchasedCourses] = useState<PurchasedCourse[]>([]);
   const [loadingCourses, setLoadingCourses] = useState(true);
+  const user = useSelector(selectUser);
+  const isAdmin = user?.is_staff || user?.is_superadmin;
 
 
 
@@ -135,20 +138,57 @@ export default function BillingAndInvoices({ billingData }: BillingAndInvoicesPr
               }
 
               return {
-                id: course.id,
+                id: `course-${course.id}`,
                 title: course.title,
                 category: course.category || 'Course',
                 url_link_name: course.url_link_name,
-                purchaseDate: enrollmentData?.created_at || course.purchaseDate || new Date().toISOString(),
-                accessTill: enrollmentData?.end_at || course.accessTill || new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString(),
+                purchaseDate: enrollmentData?.created_at || new Date().toISOString(),
+                accessTill: enrollmentData?.end_at || new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString(),
                 price: coursePrice,
                 currency: courseCurrency,
-                is_subscription: course.is_subscription,
-                is_admin_access: course.is_admin_access
+                is_subscription: course.is_subscription
               };
             });
 
-            const allPurchased = [...transformedCourses].sort((a, b) =>
+            let transformedPlaylists: any[] = [];
+            try {
+              const playlistsResponse = await api.get("/customplaylist/my-playlists/");
+              if (playlistsResponse.data.success) {
+                transformedPlaylists = (playlistsResponse.data.playlists || []).map((p: any) => {
+                  const invoiceP = invoiceListDataFromApi.find(inv => inv.is_playlist && inv.playlist_id === p.id);
+                  return {
+                    id: `playlist-${p.id}`,
+                    title: p.title,
+                    category: 'Playlist',
+                    url_link_name: '',
+                    purchaseDate: p.created_at,
+                    accessTill: invoiceP?.end_at || new Date(new Date(p.created_at).getTime() + 180 * 24 * 60 * 60 * 1000).toISOString(),
+                    price: p.total_price,
+                    currency: invoiceP?.currency || '₹',
+                    is_playlist: true
+                  };
+                });
+              }
+            } catch (pErr) {
+              console.error('Error fetching playlists:', pErr);
+            }
+
+            // Extract Subscription Plan purchases from invoice list
+            const subscriptionPlans = invoiceListDataFromApi
+              .filter(inv => inv.is_subscription)
+              .map(inv => ({
+                id: `sub-${inv.invoice_id}`,
+                title: inv.course, // Plan name
+                category: 'Subscription',
+                url_link_name: '',
+                purchaseDate: inv.created_at,
+                accessTill: inv.end_at,
+                price: inv.amount_paid,
+                currency: inv.currency || '₹',
+                is_sub_plan: true
+              }));
+
+            const allPurchased = [...transformedCourses, ...transformedPlaylists, ...subscriptionPlans].sort((a, b) =>
               new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime()
             );
 
@@ -240,17 +280,17 @@ export default function BillingAndInvoices({ billingData }: BillingAndInvoicesPr
 
 
   // Body scroll lock when any modal is open
-  // useEffect(() => {
-  //   const anyModalOpen = basicModal || customModal || purchasedModal || cancelModal || accessedCoursesModal;
-  //   if (anyModalOpen) {
-  //     document.body.style.overflow = 'hidden';
-  //   } else {
-  //     document.body.style.overflow = 'unset';
-  //   }
-  //   return () => {
-  //     document.body.style.overflow = 'unset';
-  //   };
-  // }, [basicModal, customModal, purchasedModal, cancelModal, accessedCoursesModal]);
+  useEffect(() => {
+    const anyModalOpen = basicModal || customModal || purchasedModal || cancelModal || accessedCoursesModal;
+    if (anyModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [basicModal, customModal, purchasedModal, cancelModal, accessedCoursesModal]);
 
 
   // Fetch payment history when modal opens with a selected course
@@ -263,9 +303,12 @@ export default function BillingAndInvoices({ billingData }: BillingAndInvoicesPr
       const selectedItem = purchasedCourses.find(c => c.id === selectedCourseId);
       const isPlaylist = (selectedItem as any)?.is_playlist;
 
+      const idString = String(selectedCourseId);
+      const realId = idString.includes('-') ? idString.split('-').pop() : idString;
+
       setPaymentHistoryLoading(true);
       try {
-        const response = await api.get(`/accounts/payment_history/${selectedCourseId}/`, {
+        const response = await api.get(`/accounts/payment_history/${realId}/`, {
           params: { is_playlist: isPlaylist }
         });
         const json = response.data;
@@ -312,10 +355,8 @@ export default function BillingAndInvoices({ billingData }: BillingAndInvoicesPr
         });
       }
 
-      // Third installment reminder - Only show if 2nd is NOT due
-      const isSecondDue = item.no_of_installments >= 0 && item.second_installment_due > 0;
-
-      if (item.no_of_installments === 3 && item.third_installment_due > 0 && !isSecondDue) {
+      // Third installment reminder
+      if (item.no_of_installments === 3 && item.third_installment_due > 0) {
         reminders.push({
           title: "Payment reminder",
           course: item.course_title,
@@ -344,67 +385,61 @@ export default function BillingAndInvoices({ billingData }: BillingAndInvoicesPr
   // Convert API invoice data to component format
   const getInvoiceItems = (): Invoice[] => {
     if (invoiceData.length > 0) {
-      return invoiceData.map((inv, index) => ({
-        id: String(inv.invoice_id || index + 1),
-        date: inv.created_at || new Date().toISOString(),
-        amount: inv.amount_paid
-          ? `${inv.currency || '$'}${Number(inv.amount_paid).toFixed(2)}`
-          : "$0.00",
-        status: (inv.status || 'pending') as 'paid' | 'pending' | 'failed',
-        downloadUrl: inv.download_url || `/accounts/invoice/${inv.order_id}/${inv.invoice_id}/None`,
-        // New Phase 2 fields
-        currency: inv.currency || '$',
-        currency_code: inv.currency_code || 'USD',
-        payment_method: inv.payment_method,
-        installment_number: inv.installment_number,
-        no_of_installments: inv.no_of_installments,
-        course: inv.course,
-        course_amount: inv.course_amount,
-        amount_paid: inv.amount_paid,
-        total_amount: inv.total_amount,
-      }));
+      return invoiceData.map((inv, index) => {
+        let prefix = 'inv';
+        if (inv.is_playlist) prefix = 'playlist-inv';
+        if (inv.is_subscription) prefix = 'sub-inv';
+
+        return {
+          id: `${prefix}-${inv.invoice_id || index + 1}`,
+          date: inv.created_at || new Date().toISOString(),
+          amount: inv.amount_paid
+            ? `${inv.currency || '$'}${Number(inv.amount_paid).toFixed(2)}`
+            : "$0.00",
+          status: (inv.status || 'pending') as 'paid' | 'pending' | 'failed',
+          downloadUrl: inv.download_url || `/accounts/invoice/${inv.order_id}/${inv.invoice_id}/None`,
+          // New Phase 2 fields
+          currency: inv.currency || '$',
+          currency_code: inv.currency_code || 'USD',
+          payment_method: inv.payment_method,
+          installment_number: inv.installment_number,
+          no_of_installments: inv.no_of_installments,
+          course: inv.course,
+          course_amount: inv.course_amount,
+          amount_paid: inv.amount_paid,
+          total_amount: inv.total_amount,
+        };
+      });
     }
     return data.invoices;
   };
   const invoices = getInvoiceItems();
 
   // Generate payment history from API data
-  // const getBasicInstallments = () => {
-  //   if (paymentDueData.length > 0) {
-  //     const installments: Array<{
-  //       id: number;
-  //       paid: string;
-  //       status: "Paid" | "Pending" | "Due";
-  //     }> = [];
+  const getBasicInstallments = () => {
+    if (paymentDueData.length > 0) {
+      const installments: Array<{
+        id: number;
+        paid: string;
+        status: "Paid" | "Pending" | "Due";
+      }> = [];
 
-  //     paymentDueData.forEach((item, index) => {
-  //       installments.push({
-  //         id: index + 1,
-  //         paid: formatCurrency(item.second_installment_paid || 0),
-  //         status: item.second_installment_paid > 0 ? "Paid" : "Due"
-  //       });
-  //     });
+      paymentDueData.forEach((item, index) => {
+        installments.push({
+          id: index + 1,
+          paid: formatCurrency(item.second_installment_paid || 0),
+          status: item.second_installment_paid > 0 ? "Paid" : "Due"
+        });
+      });
 
-  //     return installments;
-  //   }
+      return installments;
+    }
 
-  //   // Default mock data
-  //   return data.invoices.slice(0, 6).map((invoice, index) => ({
-  //     id: index + 1,
-  //     paid: invoice.amount,
-  //     status: invoice.status === 'paid' ? 'Paid' as const : 'Pending' as const
-  //   }));
-  // };
+    return [];
+  };
 
-  // const basicInstallments = getBasicInstallments();
-  // const customInstallments = [
-  //   { id: 1, paid: "$25", status: "Paid" as const },
-  //   { id: 2, paid: "$25", status: "Paid" as const },
-  //   { id: 3, paid: "$25", status: "Due" as const },
-  //   { id: 4, paid: "$25", status: "Due" as const },
-  //   { id: 5, paid: "$25", status: "Due" as const },
-  //   { id: 6, paid: "$25", status: "Due" as const },
-  // ];
+  const basicInstallments = getBasicInstallments();
+  const customInstallments: any[] = [];
 
 
   const getPlanDetails = () => {
@@ -434,18 +469,40 @@ export default function BillingAndInvoices({ billingData }: BillingAndInvoicesPr
 
   const planDetails = getPlanDetails();
 
-  // Prevent body scroll when modal is open
-  // useEffect(() => {
-  //   if (basicModal || customModal || purchasedModal || cancelModal) {
-  //     document.body.style.overflow = 'hidden';
-  //   } else {
-  //     document.body.style.overflow = 'auto';
-  //   }
+  // Fetch accessed courses when modal opens
+  useEffect(() => {
+    if (!accessedCoursesModal) return;
+    const fetchAccessedCourses = async () => {
+      setAccessedCoursesLoading(true);
+      try {
+        const response = await api.get('/subscriptions/accessed-courses/');
+        if (response.data.success) {
+          setAccessedCourses(response.data.courses || []);
+        } else {
+          setAccessedCourses([]);
+        }
+      } catch (err) {
+        console.error('Error fetching accessed courses:', err);
+        setAccessedCourses([]);
+      } finally {
+        setAccessedCoursesLoading(false);
+      }
+    };
+    fetchAccessedCourses();
+  }, [accessedCoursesModal]);
 
-  //   return () => {
-  //     document.body.style.overflow = 'auto';
-  //   };
-  // }, [basicModal, customModal, purchasedModal, cancelModal]);
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (basicModal || customModal || purchasedModal || cancelModal || accessedCoursesModal) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [basicModal, customModal, purchasedModal, cancelModal, accessedCoursesModal]);
 
 
   // Handle download invoice
@@ -572,13 +629,6 @@ export default function BillingAndInvoices({ billingData }: BillingAndInvoicesPr
             }
           };
 
-          // Ensure Razorpay script is loaded
-          const isLoaded = await loadRazorpayScript();
-          if (!isLoaded) {
-            toast.error("Failed to load Razorpay SDK. Please check your internet connection.");
-            return;
-          }
-
           // Create Razorpay instance and open
           const rzp = new (window as any).Razorpay(options);
           rzp.open();
@@ -598,8 +648,8 @@ export default function BillingAndInvoices({ billingData }: BillingAndInvoicesPr
   };
 
   return (
-    <div className="flex  flex-col gap-4 max-w-[100vw]  sm:max-w-[70vw]  lg:max-w-[72vw] md:max-w-[80vw]
-      mx-auto lg:ml-[-10px] sm:gap-6 lg:gap-8  py-8 sm:py-10 lg:py-12 flex-1 overflow-x-hidden">
+    <div className="flex flex-col gap-4 w-full max-w-[71vw]
+      sm:gap-6 lg:gap-8 py-8 sm:py-10 lg:py-12 flex-1 overflow-x-hidden">
 
 
       <div className="w-full mt-[-8vw] sm:mt-[-2vw]">
@@ -616,7 +666,7 @@ export default function BillingAndInvoices({ billingData }: BillingAndInvoicesPr
             </div>
           )}
 
-          {!isLoading && hasPurchasedCourses && hasDueInstallments && (
+          {!isLoading && hasPurchasedCourses && hasDueInstallments && !isAdmin && (
             <Swiper
               modules={[Pagination, Autoplay]}
               autoplay={{
@@ -671,12 +721,12 @@ export default function BillingAndInvoices({ billingData }: BillingAndInvoicesPr
           )}
 
           {/* CONDITION 4: Has courses + all installments paid → Show Thank You message */}
-          {!isLoading && hasPurchasedCourses && !hasDueInstallments && (
-            <div className="flex justify-center px-2">
-              <div className="bg-[#d4f8e8] p-4 sm:p-5 md:p-6 rounded-xl w-[90vw]">
+          {!isLoading && hasPurchasedCourses && !hasDueInstallments && !isAdmin && (
+            <div className="w-full">
+              <div className="bg-[#d4f8e8] p-4 sm:p-5 md:p-6 rounded-xl w-full">
                 <div className="flex flex-col items-center text-center gap-2">
                   <h2 className="text-[#065f46] font-bricolage text-lg sm:text-xl md:text-2xl font-bold">
-                    🎉 Thank You!
+                    Thank You!
                   </h2>
                   <p className="text-[rgba(6,95,70,0.8)] text-sm sm:text-base">
                     All your payments are completed successfully. Keep learning and growing!
@@ -789,13 +839,27 @@ export default function BillingAndInvoices({ billingData }: BillingAndInvoicesPr
               <div className="w-full flex justify-center items-center py-8">
                 <span className="text-[rgba(26,33,47,0.7)] font-bricolage text-sm">Loading history...</span>
               </div>
+            ) : isAdmin ? (
+              <div className="w-full flex flex-col items-center justify-center py-10 px-6 text-center bg-blue-50/50 rounded-xl border border-blue-100">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#174cd2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    <path d="M12 8v4" />
+                    <path d="M12 16h.01" />
+                  </svg>
+                </div>
+                <h4 className="text-[#1A212F] font-bricolage text-xl font-bold mb-2">Lifetime Admin Access</h4>
+                <p className="text-[rgba(26,33,47,0.7)] font-bricolage text-sm max-w-md leading-relaxed">
+                  You have full administrative access to all current and future courses on the platform. No purchase history to display.
+                </p>
+              </div>
             ) : purchasedCourses.filter(p => p.is_playlist || p.is_sub_plan || !p.is_subscription).length > 0 ? (
               purchasedCourses.filter(p => p.is_playlist || p.is_sub_plan || !p.is_subscription).map((item, index, filteredArray) => (
                 <div key={item.id} className="w-full">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 self-stretch w-full">
-                    <div className="flex px-3 sm:px-4 lg:px-5 py-3 sm:py-4 lg:py-4 justify-center items-center rounded-md bg-gradient-to-b from-[#000155] to-[#153F9A] w-14 sm:w-16 lg:w-20 h-12 sm:h-14 lg:h-16 flex-shrink-0">
-                      <span className="text-white font-bricolage text-xs sm:text-xs lg:text-sm font-bold leading-normal text-center">
-                        {item.category.split(' ')[0] || 'Item'}
+                    <div className="flex px-2 sm:px-3 lg:px-4 py-3 sm:py-4 lg:py-4 justify-center items-center rounded-md bg-gradient-to-b from-[#000155] to-[#153F9A] w-14 sm:w-16 lg:w-20 h-12 sm:h-14 lg:h-16 flex-shrink-0 overflow-hidden">
+                      <span className="text-white font-bricolage text-[10px] sm:text-[11px] lg:text-xs font-bold leading-tight text-center break-words">
+                        {item.category === 'Subscription' ? 'Subscription' : (item.category.split(' ')[0] || 'Item')}
                       </span>
                     </div>
                     <div className="flex flex-col justify-center items-start gap-1.5 sm:gap-2 flex-1 py-0 min-w-0">
@@ -803,17 +867,14 @@ export default function BillingAndInvoices({ billingData }: BillingAndInvoicesPr
                         {item.title}
                       </h4>
                       <div className="flex flex-col xs:flex-row xs:items-center gap-1 xs:gap-2 lg:gap-2 flex-wrap">
-                        {/* Hide purchase date for admin access */}
-                        {!item.is_admin_access && (
-                           <span className="text-[rgba(26,33,47,0.7)] font-bricolage text-xs lg:text-xs font-light leading-[150%] whitespace-nowrap">
-                            Purchased on {formatDate(item.purchaseDate)}
-                          </span>
-                        )}
+                        <span className="text-[rgba(26,33,47,0.7)] font-bricolage text-xs lg:text-xs font-light leading-[150%] whitespace-nowrap">
+                          Purchased on {formatDate(item.purchaseDate)}
+                        </span>
                         {!item.is_sub_plan && (
                           <>
-                            {!item.is_admin_access && <div className="hidden xs:block w-px h-3 sm:h-4 lg:h-4 bg-[rgba(26,33,47,0.24)]" />}
+                            <div className="hidden xs:block w-px h-3 sm:h-4 lg:h-4 bg-[rgba(26,33,47,0.24)]" />
                             <span className="text-[rgba(26,33,47,0.7)] font-bricolage text-xs lg:text-xs font-light leading-[150%] whitespace-nowrap">
-                              {item.accessTill === 'Lifetime' ? 'Lifetime Access' : `Access till ${formatDate(item.accessTill)}`}
+                              Access till {formatDate(item.accessTill)}
                             </span>
                           </>
                         )}
@@ -826,10 +887,10 @@ export default function BillingAndInvoices({ billingData }: BillingAndInvoicesPr
                       <span className="text-[#1A212F] font-bricolage text-base sm:text-lg lg:text-lg font-bold whitespace-nowrap">
                         {item.price ? `${item.currency || '₹'}${item.price.toFixed(2)}` : `${item.currency || '₹'}0`}
                       </span>
-                      {!item.is_sub_plan && !item.is_admin_access ? (
+                      {!item.is_sub_plan ? (
                         <button
                           onClick={() => {
-                            setSelectedCourseId(item.id as number);
+                            setSelectedCourseId(item.id);
                             setPurchasedModal(true);
                           }}
                           className="text-[rgba(26,33,47,0.7)] font-bricolage cursor-pointer text-xs lg:text-xs font-semibold tracking-[-0.12px] sm:tracking-[-0.14px] lg:tracking-[-0.14px] underline text-left sm:text-right hover:text-[#1A212F] whitespace-nowrap"
@@ -858,7 +919,7 @@ export default function BillingAndInvoices({ billingData }: BillingAndInvoicesPr
                 </div>
               ))
             ) : (
-              <div className="w-full flex justify-center items-center py-8">
+              <div className="w-[80vw] flex justify-center items-center py-8">
                 <span className="text-[rgba(26,33,47,0.7)] font-bricolage text-sm">No purchase history found</span>
               </div>
             )}
@@ -877,190 +938,200 @@ export default function BillingAndInvoices({ billingData }: BillingAndInvoicesPr
             Invoices
           </h3>
 
-          {/* Desktop and Tablet */}
-          <div className="hidden md:block w-full overflow-x-auto rounded-xl border border-[rgba(26,33,47,0.1)] bg-white">
-            <div className="min-w-[550px]">
+          {isAdmin ? (
+            <div className="w-full p-6 bg-blue-50 border border-blue-100 rounded-xl text-center">
+              <p className="text-blue-700 font-medium">
+                No invoices are generated for Administrative Access.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Desktop and Tablet */}
+              <div className="hidden md:block w-full overflow-x-auto rounded-xl border border-[rgba(26,33,47,0.1)] bg-white">
+                <div className="min-w-[550px]">
 
-              {/* Header */}
-              <div className="grid grid-cols-[2fr_minmax(80px,1fr)_minmax(80px,1fr)_minmax(100px,1fr)_minmax(80px,1fr)_minmax(60px,0.5fr)] gap-4 px-5 lg:px-6 py-4 border-b border-[rgba(26,33,47,0.1)] bg-gray-50 items-center">
-                <span className="text-xs lg:text-sm font-semibold text-[#1A212F] uppercase tracking-wider">Course / Invoice</span>
-                <span className="text-xs lg:text-sm font-semibold text-[#1A212F] uppercase tracking-wider">Amount</span>
-                <span className="text-xs lg:text-sm font-semibold text-[#1A212F] uppercase tracking-wider">Status</span>
-                <span className="text-xs lg:text-sm font-semibold text-[#1A212F] uppercase tracking-wider">Date</span>
-                <span className="text-xs lg:text-sm font-semibold text-[#1A212F] uppercase tracking-wider">Installment</span>
-                <span className="text-xs lg:text-sm font-semibold text-[#1A212F] uppercase tracking-wider text-center">Action</span>
+                  {/* Header */}
+                  <div className="grid grid-cols-[2fr_minmax(80px,1fr)_minmax(80px,1fr)_minmax(100px,1fr)_minmax(80px,1fr)_minmax(60px,0.5fr)] gap-4 px-5 lg:px-6 py-4 border-b border-[rgba(26,33,47,0.1)] bg-gray-50 items-center">
+                    <span className="text-xs lg:text-sm font-semibold text-[#1A212F] uppercase tracking-wider">Course / Invoice</span>
+                    <span className="text-xs lg:text-sm font-semibold text-[#1A212F] uppercase tracking-wider">Amount</span>
+                    <span className="text-xs lg:text-sm font-semibold text-[#1A212F] uppercase tracking-wider">Status</span>
+                    <span className="text-xs lg:text-sm font-semibold text-[#1A212F] uppercase tracking-wider">Date</span>
+                    <span className="text-xs lg:text-sm font-semibold text-[#1A212F] uppercase tracking-wider">Installment</span>
+                    <span className="text-xs lg:text-sm font-semibold text-[#1A212F] uppercase tracking-wider text-center">Action</span>
+                  </div>
+
+                  {/* Rows */}
+                  <div className="flex flex-col">
+                    {invoices.length > 0 ? invoices.map((invoice, index) => {
+                      const statusBadge = getStatusBadge(invoice.status);
+                      const isLoading = invoiceCheckLoading === parseInt(invoice.id);
+                      return (
+                        <div
+                          key={invoice.id}
+                          className={`grid grid-cols-[2fr_minmax(80px,1fr)_minmax(80px,1fr)_minmax(100px,1fr)_minmax(80px,1fr)_minmax(60px,0.5fr)] gap-4 px-5 lg:px-6 py-4 items-center hover:bg-[#F8FBFF] transition-colors ${index !== invoices.length - 1 ? 'border-b border-[rgba(26,33,47,0.06)]' : ''}`}
+                        >
+                          <div className="flex flex-col gap-1.5 overflow-hidden">
+                            <span className="text-sm font-semibold text-[#1A212F] truncate">
+                              {invoice.id}
+                            </span>
+                            {invoice.course && (
+                              <span className="text-xs font-semibold text-[rgba(26,33,47,0.6)] truncate" title={invoice.course}>
+                                {invoice.course}
+                              </span>
+                            )}
+                          </div>
+
+                          <span className="text-sm font-medium text-[#1A212F] truncate">
+                            {invoice.amount}
+                          </span>
+
+                          <div>
+                            <span className={`text-xs font-semibold px-2.5 py-1 rounded-md inline-flex items-center justify-center ${statusBadge.color}`}>
+                              {statusBadge.label}
+                            </span>
+                          </div>
+
+                          <span className="text-sm font-medium text-[rgba(26,33,47,0.8)] truncate">
+                            {formatDate(invoice.date)}
+                          </span>
+
+                          <span className="text-sm  font-medium text-[rgba(26,33,47,0.8)] truncate">
+                            {invoice.installment_number ? `${invoice.installment_number}/${invoice.no_of_installments || 1}` : '1/1'}
+                          </span>
+
+                          <div className="flex justify-center">
+                            <button
+                              onClick={() => handleDownloadInvoice(invoice)}
+                              disabled={isLoading}
+                              className="p-1.5 rounded-md hover:bg-[#E5F4FF] text-[#174CD2] transition-colors disabled:opacity-50 disabled:cursor-not-allowed group"
+                              title={isLoading ? 'Checking invoice status...' : 'Download invoice'}
+                            >
+                              {isLoading ? (
+                                <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" strokeOpacity="0.25"></circle>
+                                  <path d="M12 2a10 10 0 0 1 0 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round"></path>
+                                </svg>
+                              ) : (
+                                <svg
+                                  className="w-5 h-5 group-hover:scale-110 transition-transform"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <path
+                                    d="M12 4v11m0 0l-3.5-3.5M12 15l3.5-3.5M6 19h12"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    }) : (
+                      <div className="py-8 text-center text-sm text-[rgba(26,33,47,0.6)]">
+                        No invoices found.
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              {/* Rows */}
-              <div className="flex flex-col">
-                {invoices.length > 0 ? invoices.map((invoice, index) => {
+              {/* Mobile */}
+              <div className="md:hidden flex flex-col mr-10">
+                {invoices.length > 0 ? invoices.map((invoice) => {
                   const statusBadge = getStatusBadge(invoice.status);
                   const isLoading = invoiceCheckLoading === parseInt(invoice.id);
                   return (
-                    <div
-                      key={invoice.id}
-                      className={`grid grid-cols-[2fr_minmax(80px,1fr)_minmax(80px,1fr)_minmax(100px,1fr)_minmax(80px,1fr)_minmax(60px,0.5fr)] gap-4 px-5 lg:px-6 py-4 items-center hover:bg-[#F8FBFF] transition-colors ${index !== invoices.length - 1 ? 'border-b border-[rgba(26,33,47,0.06)]' : ''}`}
-                    >
-                      <div className="flex flex-col gap-1.5 overflow-hidden">
-                        <span className="text-sm font-semibold text-[#1A212F] truncate">
-                          Invoice #{invoice.id}
-                        </span>
-                        {invoice.course && (
-                          <span className="text-xs font-semibold text-[rgba(26,33,47,0.6)] truncate" title={invoice.course}>
-                            {invoice.course}
+                    <div key={invoice.id} className="flex flex-col px-1">
+                      <div className="py-4 hover:bg-gray-50 transition-colors">
+
+                        {/* Top Row: Title + Download */}
+                        <div className="flex justify-between items-start gap-3 w-full mb-3">
+                          <div className="flex flex-col gap-1 flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-[#1A212F] truncate">
+                              {invoice.id}
+                            </p>
+                            {invoice.course && (
+                              <p className="text-xs text-[rgba(26,33,47,0.6)] line-clamp-2">
+                                {invoice.course}
+                              </p>
+                            )}
+                          </div>
+
+                          <button
+                            onClick={() => handleDownloadInvoice(invoice)}
+                            disabled={isLoading}
+                            className="p-2 shrink-0 bg-[#F8FBFF] hover:bg-[#E5F4FF] text-[#174CD2] rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            {isLoading ? (
+                              <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" strokeOpacity="0.25"></circle>
+                                <path d="M12 2a10 10 0 0 1 0 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round"></path>
+                              </svg>
+                            ) : (
+                              <svg
+                                className="w-4 h-4"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                              >
+                                <path
+                                  d="M12 4v11m0 0l-3.5-3.5M12 15l3.5-3.5M6 19h12"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Middle Row: Status + Installment */}
+                        <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+                          <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md inline-block ${statusBadge.color}`}>
+                            {statusBadge.label}
                           </span>
-                        )}
-                      </div>
-
-                      <span className="text-sm font-medium text-[#1A212F] truncate">
-                        {invoice.amount}
-                      </span>
-
-                      <div>
-                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-md inline-flex items-center justify-center ${statusBadge.color}`}>
-                          {statusBadge.label}
-                        </span>
-                      </div>
-
-                      <span className="text-sm font-medium text-[rgba(26,33,47,0.8)] truncate">
-                        {formatDate(invoice.date)}
-                      </span>
-
-                      <span className="text-sm  font-medium text-[rgba(26,33,47,0.8)] truncate">
-                        {invoice.installment_number ? `${invoice.installment_number}/${invoice.no_of_installments || 1}` : '1/1'}
-                      </span>
-
-                      <div className="flex justify-center">
-                        <button
-                          onClick={() => handleDownloadInvoice(invoice)}
-                          disabled={isLoading}
-                          className="p-1.5 rounded-md hover:bg-[#E5F4FF] text-[#174CD2] transition-colors disabled:opacity-50 disabled:cursor-not-allowed group"
-                          title={isLoading ? 'Checking invoice status...' : 'Download invoice'}
-                        >
-                          {isLoading ? (
-                            <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none">
-                              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" strokeOpacity="0.25"></circle>
-                              <path d="M12 2a10 10 0 0 1 0 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round"></path>
-                            </svg>
-                          ) : (
-                            <svg
-                              className="w-5 h-5 group-hover:scale-110 transition-transform"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              xmlns="http://www.w3.org/2000/svg"
-                            >
-                              <path
-                                d="M12 4v11m0 0l-3.5-3.5M12 15l3.5-3.5M6 19h12"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            </svg>
+                          {invoice.installment_number && (
+                            <span className="text-xs font-medium text-[rgba(26,33,47,0.7)] bg-gray-100 px-2 py-1 rounded-md">
+                              Inst. {invoice.installment_number}/{invoice.no_of_installments || 1}
+                            </span>
                           )}
-                        </button>
+                        </div>
+
+                        {/* Bottom Row: Date and Amount */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <div className="flex items-center gap-1.5 text-[rgba(26,33,47,0.7)]">
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                              <line x1="16" y1="2" x2="16" y2="6" />
+                              <line x1="8" y1="2" x2="8" y2="6" />
+                              <line x1="3" y1="10" x2="21" y2="10" />
+                            </svg>
+                            <span className="font-medium">{formatDate(invoice.date)}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-[rgba(26,33,47,0.6)]">Amount:</span>
+                            <span className="font-bold text-[#1A212F] text-sm">{invoice.amount}</span>
+                          </div>
+                        </div>
+
                       </div>
+                      {/* Gray 300 line mark after each invoice */}
+                      <div className="w-full h-[1px] bg-gray-300" />
                     </div>
                   );
                 }) : (
-                  <div className="py-8 text-center text-sm text-[rgba(26,33,47,0.6)]">
+                  <div className="py-6 text-center text-sm text-[rgba(26,33,47,0.6)]">
                     No invoices found.
                   </div>
                 )}
               </div>
-            </div>
-          </div>
-
-          {/* Mobile */}
-          <div className="md:hidden flex flex-col mr-10">
-            {invoices.length > 0 ? invoices.map((invoice) => {
-              const statusBadge = getStatusBadge(invoice.status);
-              const isLoading = invoiceCheckLoading === parseInt(invoice.id);
-              return (
-                <div key={invoice.id} className="flex flex-col px-1">
-                  <div className="py-4 hover:bg-gray-50 transition-colors">
-
-                    {/* Top Row: Title + Download */}
-                    <div className="flex justify-between items-start gap-3 w-full mb-3">
-                      <div className="flex flex-col gap-1 flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-[#1A212F] truncate">
-                          Invoice #{invoice.id}
-                        </p>
-                        {invoice.course && (
-                          <p className="text-xs text-[rgba(26,33,47,0.6)] line-clamp-2">
-                            {invoice.course}
-                          </p>
-                        )}
-                      </div>
-
-                      <button
-                        onClick={() => handleDownloadInvoice(invoice)}
-                        disabled={isLoading}
-                        className="p-2 shrink-0 bg-[#F8FBFF] hover:bg-[#E5F4FF] text-[#174CD2] rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        {isLoading ? (
-                          <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" strokeOpacity="0.25"></circle>
-                            <path d="M12 2a10 10 0 0 1 0 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round"></path>
-                          </svg>
-                        ) : (
-                          <svg
-                            className="w-4 h-4"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                          >
-                            <path
-                              d="M12 4v11m0 0l-3.5-3.5M12 15l3.5-3.5M6 19h12"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        )}
-                      </button>
-                    </div>
-
-                    {/* Middle Row: Status + Installment */}
-                    <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-                      <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md inline-block ${statusBadge.color}`}>
-                        {statusBadge.label}
-                      </span>
-                      {invoice.installment_number && (
-                        <span className="text-xs font-medium text-[rgba(26,33,47,0.7)] bg-gray-100 px-2 py-1 rounded-md">
-                          Inst. {invoice.installment_number}/{invoice.no_of_installments || 1}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Bottom Row: Date and Amount */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                      <div className="flex items-center gap-1.5 text-[rgba(26,33,47,0.7)]">
-                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                          <line x1="16" y1="2" x2="16" y2="6" />
-                          <line x1="8" y1="2" x2="8" y2="6" />
-                          <line x1="3" y1="10" x2="21" y2="10" />
-                        </svg>
-                        <span className="font-medium">{formatDate(invoice.date)}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="text-[rgba(26,33,47,0.6)]">Amount:</span>
-                        <span className="font-bold text-[#1A212F] text-sm">{invoice.amount}</span>
-                      </div>
-                    </div>
-
-                  </div>
-                  {/* Gray 300 line mark after each invoice */}
-                  <div className="w-full h-[1px] bg-gray-300" />
-                </div>
-              );
-            }) : (
-              <div className="py-6 text-center text-sm text-[rgba(26,33,47,0.6)]">
-                No invoices found.
-              </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
 
 
@@ -1068,122 +1139,263 @@ export default function BillingAndInvoices({ billingData }: BillingAndInvoicesPr
 
       </div>
 
-      {/* Modal Overlay / Payment History Modal */}
-      {purchasedModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-[101] px-4 py-6 overflow-hidden">
+      {/* Modal Overlay */}
+      {(basicModal || customModal || purchasedModal || cancelModal || accessedCoursesModal) && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-md z-[100] transition-all duration-300"
+          onClick={() => {
+            setBasicModal(false);
+            setCustomModal(false);
+            setPurchasedModal(false);
+            setCancelModal(false);
+            setAccessedCoursesModal(false);
+          }}
+        />
+      )}
+
+      {/* Basic Plan Modal */}
+      {basicModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-[101] px-2 sm:px-4 overflow-y-auto py-4">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-md transition-all duration-300"
-            onClick={() => setPurchasedModal(false)}
-          />
-          <div
-            className="bg-white rounded-2xl shadow-2xl relative w-full max-w-2xl overflow-hidden flex flex-col my-auto z-10 animate-in fade-in zoom-in duration-300"
+            className="bg-white rounded-xl sm:rounded-2xl shadow-xl relative 
+                        w-full max-w-[95%] xs:max-w-xs sm:max-w-md md:max-w-lg lg:max-w-2xl
+                        max-h-[85vh] sm:max-h-[90vh] overflow-y-auto p-3 sm:p-4 md:p-6 lg:p-8 my-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal Header */}
-            <div className="px-6 pt-6 pb-4 border-b border-gray-100 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-[#1A212F] tracking-tight">
-                  Payment History
-                </h2>
-                <p className="text-[#1A212F]/60 mt-0.5 text-xs sm:text-sm font-medium">
-                  {purchasedCourses.find(c => c.id === selectedCourseId)?.title || "Course details"}
-                </p>
-              </div>
-              <button
-                onClick={() => setPurchasedModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-            </div>
 
-            {/* Modal Content */}
-            <div className="px-6 py-4 overflow-y-auto max-h-[50vh] scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
-              {paymentHistoryLoading ? (
-                <div className="flex justify-center items-center py-10">
-                  <span className="text-gray-500 font-medium">Loading history...</span>
-                </div>
-              ) : paymentHistory && paymentHistory.payments && Array.isArray(paymentHistory.payments) && paymentHistory.payments.length > 0 ? (
-                <div className="flex flex-col gap-3">
+            <button
+              onClick={() => setBasicModal(false)}
+              className="absolute top-2 right-3 sm:top-3 sm:right-4 text-xl sm:text-2xl md:text-3xl text-gray-500 hover:text-gray-700 cursor-pointer z-10"
+            >
+              &times;
+            </button>
 
-                  {/* Summary Block */}
-                  <div className="flex flex-wrap items-center justify-between p-4 bg-gray-50 rounded-xl mb-2 gap-4 border border-gray-100">
-                    <div className="flex flex-col flex-1 min-w-[80px]">
-                      <span className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 mb-0.5">Total Fee</span>
-                      <span className="font-bold text-[#1A212F]">{paymentHistory.currency || '$'}{paymentHistory.total_fee}</span>
-                    </div>
-                    <div className="w-px h-8 bg-gray-200 hidden sm:block"></div>
-                    <div className="flex flex-col flex-1 min-w-[80px] sm:items-center">
-                      <span className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 mb-0.5">Total Paid</span>
-                      <span className="font-bold text-green-600">{paymentHistory.currency || '$'}{paymentHistory.total_paid}</span>
-                    </div>
-                    <div className="w-px h-8 bg-gray-200 hidden sm:block"></div>
-                    <div className="flex flex-col flex-1 min-w-[80px] sm:items-end">
-                      <span className="text-[11px] uppercase tracking-wider font-semibold text-gray-500 mb-0.5">Remaining Due</span>
-                      <span className="font-bold text-red-500">{paymentHistory.currency || '$'}{paymentHistory.remaining_due}</span>
-                    </div>
-                  </div>
+            <h2 className="text-center text-lg sm:text-xl md:text-2xl lg:text-3xl mt-4 sm:mt-5 font-semibold text-gray-900">
+              {planDetails.name}
+            </h2>
 
-                  {paymentHistory.payments.map((payment: any, index: number) => (
-                    <div key={payment.payment_id || index} className="group">
-                      <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-white border border-gray-100 hover:border-blue-200 hover:shadow-sm transition-all duration-200">
-                        <div className="flex items-center gap-4 min-w-0">
-                          <div className="flex-shrink-0 w-12 h-12 flex items-center justify-center rounded-lg bg-green-50 text-green-600">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                            </svg>
-                          </div>
-                          <div>
-                            <h4 className="text-[#1A212F] text-sm sm:text-base font-semibold leading-snug">
-                              {payment.amount !== undefined ? `Amount Paid: ${payment.currency || '$'}${payment.amount}` : payment.amount_paid ? `Amount Paid: ${payment.currency || '$'}${payment.amount_paid}` : "Payment"}
-                            </h4>
-                            <p className="text-xs text-gray-500 mt-1">
-                              {payment.paid_at ? formatDate(payment.paid_at) : (payment.created_at ? formatDate(payment.created_at) : "N/A")}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end">
-                          <span className={`text-xs font-semibold px-2.5 py-1 rounded-md whitespace-nowrap ${payment.status === 'completed' || payment.status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                            {payment.status === 'completed' || payment.status === 'paid' ? 'Success' : payment.status ? payment.status.charAt(0).toUpperCase() + payment.status.slice(1) : 'Pending'}
-                          </span>
-                          {payment.installment_number && (
-                            <span className="text-xs text-[rgba(26,33,47,0.7)] mt-1.5 font-medium">Inst. {payment.installment_number} of {payment.no_of_installments || paymentHistory.no_of_installments || 1}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+            <p className="text-center text-gray-500 mt-1 sm:mt-2 mb-4 sm:mb-5 text-sm sm:text-base md:text-lg lg:text-xl">
+              Monthly Subscription
+            </p>
+
+            <div className="overflow-x-auto -mx-1 sm:-mx-0">
+              <table className="w-full text-xs sm:text-sm md:text-base text-left text-gray-700 min-w-[280px]">
+                <thead>
+                  <tr className="border-b border-gray-200 text-gray-500">
+                    <th className="py-2 sm:py-3 px-2 sm:px-3 font-medium whitespace-nowrap">Month</th>
+                    <th className="py-2 sm:py-3 px-2 sm:px-3 font-medium whitespace-nowrap">Amount</th>
+                    <th className="py-2 sm:py-3 px-2 sm:px-3 font-medium whitespace-nowrap">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {basicInstallments.map((item) => (
+                    <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-2 sm:py-3 px-2 sm:px-3 whitespace-nowrap">Month {item.id}</td>
+                      <td className="py-2 sm:py-3 px-2 sm:px-3 whitespace-nowrap">{item.paid}</td>
+                      <td
+                        className={`py-2 sm:py-3 px-2 sm:px-3 font-medium whitespace-nowrap ${item.status === "Paid" ? "text-green-600" : "text-gray-500"
+                          }`}
+                      >
+                        {item.status}
+                      </td>
+                    </tr>
                   ))}
-                </div>
-              ) : (
-                <div className="text-center py-10 px-4">
-                  <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
-                      <rect x="2" y="4" width="20" height="16" rx="2"></rect>
-                      <line x1="2" y1="10" x2="22" y2="10"></line>
-                    </svg>
-                  </div>
-                  <p className="text-gray-500 text-sm font-medium">No payment history found.</p>
-                </div>
-              )}
+                </tbody>
+              </table>
             </div>
 
-            {/* Modal Footer */}
-            <div className="px-6 py-5 border-t border-gray-100">
+            <div className="mt-4 sm:mt-5 text-center">
               <button
-                onClick={() => setPurchasedModal(false)}
-                className="w-full py-3 bg-[#174cd2] hover:bg-[#174cd2]/90 text-white rounded-xl font-bold text-sm sm:text-base cursor-pointer shadow-lg shadow-blue-200 transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0"
+                onClick={() => setBasicModal(false)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 sm:py-2.5 md:py-3 px-4 sm:px-5 md:px-6 rounded-lg text-sm sm:text-base md:text-lg w-full sm:w-auto transition-colors whitespace-nowrap"
               >
-                Close
+                Okay, Got it
               </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* Custom Plan Modal */}
+      {customModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-[101] px-2 sm:px-4 overflow-y-auto py-4">
+          <div
+            className="bg-white rounded-xl sm:rounded-2xl shadow-xl relative 
+                        w-full max-w-[95%] xs:max-w-xs sm:max-w-md md:max-w-lg lg:max-w-2xl
+                        max-h-[85vh] sm:max-h-[90vh] overflow-y-auto p-3 sm:p-4 md:p-6 lg:p-8 my-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
 
+            <button
+              onClick={() => setCustomModal(false)}
+              className="absolute top-2 right-3 sm:top-3 sm:right-4 text-xl sm:text-2xl md:text-3xl text-gray-500 hover:text-gray-700 cursor-pointer z-10"
+            >
+              &times;
+            </button>
+
+            <h2 className="text-center text-lg sm:text-xl md:text-2xl lg:text-3xl mt-4 sm:mt-5 font-semibold text-gray-900">
+              Custom plan
+            </h2>
+
+            <p className="text-center text-gray-500 mt-1 sm:mt-2 mb-4 sm:mb-5 text-sm sm:text-base md:text-lg lg:text-xl">
+              Yearly Subscription
+            </p>
+
+            <div className="overflow-x-auto -mx-1 sm:-mx-0">
+              <table className="w-full text-xs sm:text-sm md:text-base text-left text-gray-700 min-w-[280px]">
+                <thead>
+                  <tr className="border-b border-gray-200 text-gray-500">
+                    <th className="py-2 sm:py-3 px-2 sm:px-3 font-medium whitespace-nowrap">Installment</th>
+                    <th className="py-2 sm:py-3 px-2 sm:px-3 font-medium whitespace-nowrap">Amount</th>
+                    <th className="py-2 sm:py-3 px-2 sm:px-3 font-medium whitespace-nowrap">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customInstallments.map((item) => (
+                    <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-2 sm:py-3 px-2 sm:px-3 whitespace-nowrap">Installment {item.id}</td>
+                      <td className="py-2 sm:py-3 px-2 sm:px-3 whitespace-nowrap">{item.paid}</td>
+                      <td
+                        className={`py-2 sm:py-3 px-2 sm:px-3 font-medium whitespace-nowrap ${item.status === "Paid" ? "text-green-600" : "text-gray-500"
+                          }`}
+                      >
+                        {item.status}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-4 sm:mt-5 text-center">
+              <button
+                onClick={() => setCustomModal(false)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 sm:py-2.5 md:py-3 px-4 sm:px-5 md:px-6 rounded-lg text-sm sm:text-base md:text-lg w-full sm:w-auto transition-colors whitespace-nowrap"
+              >
+                Okay, Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Purchased Course Modal */}
+      {purchasedModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-[101] px-2 sm:px-4 overflow-y-auto py-4">
+          <div
+            className="bg-white rounded-xl sm:rounded-2xl shadow-xl relative 
+                        w-full max-w-[95%] xs:max-w-xs sm:max-w-md md:max-w-lg
+                        max-h-[85vh] sm:max-h-[90vh] overflow-y-auto p-3 sm:p-4 md:p-6 my-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+
+            <button
+              onClick={() => setPurchasedModal(false)}
+              className="absolute top-2 right-3 sm:top-3 sm:right-4 text-xl sm:text-2xl text-gray-500 hover:text-gray-700 cursor-pointer z-10"
+            >
+              &times;
+            </button>
+
+            {paymentHistoryLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <span className="text-gray-500 text-sm">Loading payment history...</span>
+              </div>
+            ) : paymentHistory ? (
+              <>
+                <h2 className="text-center text-lg sm:text-xl md:text-2xl mt-3 sm:mt-4 font-semibold text-gray-900">
+                  Payment History
+                </h2>
+
+                <p className="text-center text-gray-500 mt-1 mb-3 sm:mb-4 text-sm sm:text-base md:text-lg px-2">
+                  {paymentHistory.course_name}
+                </p>
+
+                <div className="bg-gradient-to-r from-[#E5F4FF] to-[#F8FBFF] rounded-lg sm:rounded-xl p-2 sm:p-3 md:p-4 mb-3 sm:mb-4 md:mb-5">
+                  <div className="flex flex-col xs:flex-row xs:items-center gap-1.5 xs:gap-2 sm:gap-3 md:gap-4">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs sm:text-sm font-medium text-gray-700">Course Fee:</span>
+                      <span className="text-xs sm:text-sm font-semibold">{paymentHistory.currency}{paymentHistory.total_fee?.toFixed(2)}</span>
+                    </div>
+                    <div className="hidden xs:block w-px h-3 sm:h-4 bg-gray-300"></div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs sm:text-sm font-medium text-gray-700">Installments:</span>
+                      <span className="text-xs sm:text-sm">{paymentHistory.no_of_installments}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto -mx-1 sm:-mx-0">
+                  <table className="w-full text-xs sm:text-sm md:text-base text-left text-gray-700 min-w-[280px]">
+                    <thead>
+                      <tr className="border-b border-gray-200 text-gray-500">
+                        <th className="py-2 sm:py-3 px-2 sm:px-3 font-medium whitespace-nowrap">Installment</th>
+                        <th className="py-2 sm:py-3 px-2 sm:px-3 font-medium whitespace-nowrap">Amount</th>
+                        <th className="py-2 sm:py-3 px-2 sm:px-3 font-medium whitespace-nowrap">Paid Date</th>
+                        <th className="py-2 sm:py-3 px-2 sm:px-3 font-medium whitespace-nowrap">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paymentHistory.payments.map((payment: any, index: number) => (
+                        <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-2 sm:py-3 px-2 sm:px-3 whitespace-nowrap">#{payment.installment_number}</td>
+                          <td className="py-2 sm:py-3 px-2 sm:px-3 whitespace-nowrap">{paymentHistory.currency}{payment.amount?.toFixed(2)}</td>
+                          <td className="py-2 sm:py-3 px-2 sm:px-3 whitespace-nowrap">
+                            {payment.paid_at ? formatDate(payment.paid_at) : 'N/A'}
+                          </td>
+                          <td className="py-2 sm:py-3 px-2 sm:px-3 font-medium text-green-600 whitespace-nowrap">
+                            {payment.status}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex flex-col gap-2 mt-3 sm:mt-4 md:mt-5 pt-2 sm:pt-3 border-t border-gray-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs sm:text-sm md:text-base font-medium text-gray-700">Total Paid:</span>
+                    <span className="text-base sm:text-lg md:text-xl font-bold text-gray-900">
+                      {paymentHistory.currency}{paymentHistory.total_paid?.toFixed(2)}
+                    </span>
+                  </div>
+                  {paymentHistory.remaining_due > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs sm:text-sm md:text-base font-medium text-gray-700">Remaining Due:</span>
+                      <span className="text-base sm:text-lg md:text-xl font-bold text-orange-600">
+                        {paymentHistory.currency}{paymentHistory.remaining_due?.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-3 sm:mt-4 md:mt-5 text-center">
+                  <button
+                    onClick={() => setPurchasedModal(false)}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 sm:py-2.5 md:py-3 px-4 sm:px-5 md:px-6 rounded-lg text-sm sm:text-base w-full sm:w-auto transition-colors whitespace-nowrap"
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="text-center text-lg sm:text-xl md:text-2xl mt-3 sm:mt-4 font-semibold text-gray-900">
+                  Payment History
+                </h2>
+                <p className="text-center text-gray-500 mt-4 mb-4">No payment history found</p>
+                <div className="mt-3 sm:mt-4 md:mt-5 text-center">
+                  <button
+                    onClick={() => setPurchasedModal(false)}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 sm:py-2.5 md:py-3 px-4 sm:px-5 md:px-6 rounded-lg text-sm sm:text-base w-full sm:w-auto transition-colors whitespace-nowrap"
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Cancel Modal */}
       {cancelModal && (
@@ -1276,8 +1488,12 @@ export default function BillingAndInvoices({ billingData }: BillingAndInvoicesPr
             {/* Modal Content - List */}
             <div className="px-6 py-4 overflow-y-auto max-h-[50vh] scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
               <div className="flex flex-col gap-3">
-                {purchasedCourses.filter(p => !p.is_playlist && !p.is_sub_plan && p.is_subscription).length > 0 ? (
-                  purchasedCourses.filter(p => !p.is_playlist && !p.is_sub_plan && p.is_subscription).map((item) => (
+                {accessedCoursesLoading ? (
+                  <div className="text-center py-10 px-4">
+                    <span className="text-gray-500 text-sm font-medium">Loading courses...</span>
+                  </div>
+                ) : accessedCourses.length > 0 ? (
+                  accessedCourses.map((item) => (
                     <div key={item.id} className="group">
                       <div className="flex items-center gap-4 p-4 rounded-xl bg-white border border-gray-100 hover:border-blue-200 hover:shadow-sm transition-all duration-200">
                         <div className="flex-shrink-0 w-12 h-12 flex items-center justify-center rounded-lg bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors duration-200">
@@ -1293,7 +1509,7 @@ export default function BillingAndInvoices({ billingData }: BillingAndInvoicesPr
                           <div className="flex items-center gap-1.5 mt-1">
                             <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
                             <span className="text-[#1A212F]/50 text-[11px] font-medium uppercase tracking-wider">
-                              Active Access
+                              {item.category}
                             </span>
                           </div>
                         </div>
