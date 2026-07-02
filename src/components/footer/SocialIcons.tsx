@@ -6,10 +6,10 @@ const SocialIcons = () => {
   return (
     <div className="social-icons">
       <a
-        href="https://github.com/deepeigen"
+        href="7552980307"
         target="_blank"
         rel="noopener noreferrer"
-        aria-label="GitHub"
+        aria-label="Phone"
       >
         <IoCall />
       </a>
